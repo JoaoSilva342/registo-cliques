@@ -19,13 +19,61 @@
     </header>
 
     <section class="zona-botoes">
-      <button class="botao" data-botao="Botão 1">Botão 1</button>
-      <button class="botao" data-botao="Botão 2">Botão 2</button>
-      <button class="botao" data-botao="Botão 3">Botão 3</button>
-      <button class="botao" data-botao="Botão 4">Botão 4</button>
+
+      <div class="cartao-botao">
+        <button class="botao" data-botao="Botão 1">Botão 1</button>
+        <div class="contador">Cliques hoje: <span id="cont-b1">0</span></div>
+      </div>
+
+      <div class="cartao-botao">
+        <button class="botao" data-botao="Botão 2">Botão 2</button>
+        <div class="contador">Cliques hoje: <span id="cont-b2">0</span></div>
+      </div>
+
+      <div class="cartao-botao">
+        <button class="botao" data-botao="Botão 3">Botão 3</button>
+        <div class="contador">Cliques hoje: <span id="cont-b3">0</span></div>
+      </div>
+
+      <div class="cartao-botao">
+        <button class="botao" data-botao="Botão 4">Botão 4</button>
+        <div class="contador">Cliques hoje: <span id="cont-b4">0</span></div>
+      </div>
+
     </section>
 
   </main>
+
+  <!-- Nota / Modal -->
+  <div id="fundo-modal" class="fundo-modal escondido" role="dialog" aria-modal="true" aria-labelledby="titulo-modal">
+    <div class="modal" role="document">
+      <h2 id="titulo-modal">Clique registado</h2>
+
+      <div class="linha">
+        <span class="etiqueta">Botão clicado:</span>
+        <span id="modal-botao" class="valor"></span>
+      </div>
+
+      <div class="linha">
+        <span class="etiqueta">Data:</span>
+        <span id="modal-data" class="valor"></span>
+      </div>
+
+      <div class="linha">
+        <span class="etiqueta">Hora:</span>
+        <span id="modal-hora" class="valor"></span>
+      </div>
+
+      <div class="linha">
+        <span class="etiqueta">Cliques deste botão hoje:</span>
+        <span id="modal-total-botao" class="valor"></span>
+      </div>
+
+      <div class="acoes-modal">
+        <button id="fechar-modal" class="botao-fechar">Fechar</button>
+      </div>
+    </div>
+  </div>
 
   <script src="/static/script.js"></script>
 </body>
