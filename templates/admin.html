@@ -6,144 +6,54 @@
   <title>Admin</title>
   <link rel="stylesheet" href="/static/estilo.css" />
   <style>
-    .admin-caixa { margin-top: 18px; }
-    .admin-cartao {
+    .bloco-admin {
       background: rgba(255,255,255,0.06);
-      border: 1px solid var(--borda);
+      border: 1px solid rgba(255,255,255,0.12);
       border-radius: 16px;
-      padding: 16px;
-      margin-top: 14px;
+      padding: 18px 16px;
+      margin-top: 18px;
     }
-    .linha-admin { display:flex; gap:12px; flex-wrap: wrap; align-items:center; }
-    .input-admin {
-      padding: 12px 12px;
-      border-radius: 14px;
-      border: 1px solid var(--borda);
-      background: rgba(0,0,0,0.25);
-      color: var(--texto);
-      width: min(460px, 100%);
+    .botoes-admin {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 10px;
     }
-    .botao-pequeno {
-      padding: 12px 14px;
+    .btn-admin {
+      padding: 14px 16px;
       border-radius: 14px;
-      border: 1px solid var(--borda);
+      border: 1px solid rgba(255,255,255,0.12);
       background: rgba(255,255,255,0.12);
-      color: var(--texto);
-      font-weight: 700;
+      color: #e7ecff;
+      font-weight: 800;
       cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
     }
-    .botao-pequeno:hover { background: rgba(255,255,255,0.18); }
-    .lista-ficheiros { margin: 10px 0 0; padding-left: 18px; }
-    .lista-ficheiros li { margin: 8px 0; }
-    .ligacao { color: var(--texto); }
-    .avisos { color: var(--texto-apagado); margin-top: 8px; }
+    .btn-admin:hover {
+      background: rgba(255,255,255,0.18);
+    }
   </style>
 </head>
 
 <body>
   <main class="caixa-principal">
     <header class="cabecalho">
-      <h1>Administração</h1>
-      <p class="avisos">Página para enviar, descarregar e apagar ficheiros.</p>
+      <h1>Admin</h1>
     </header>
 
-    <section class="admin-caixa">
-
-      {% if not autorizado %}
-        <div class="admin-cartao">
-          <p><strong>{{ mensagem }}</strong></p>
-          <p class="avisos">
-            Exemplo: <code>/admin?pw=admin123</code>
-          </p>
+    {% if not autorizado %}
+      <div class="bloco-admin">
+        <p><strong>Acesso negado.</strong></p>
+      </div>
+    {% else %}
+      <div class="bloco-admin">
+        <div class="botoes-admin">
+          <a class="btn-admin" href="/admin/download_txt?u={{ u }}&p={{ p }}">Download TXT</a>
+          <a class="btn-admin" href="/admin/download_db?u={{ u }}&p={{ p }}">Download DB</a>
         </div>
-      {% else %}
-        <div class="admin-cartao">
-          <h2>Upload de ficheiros</h2>
-          <p class="avisos">Extensões permitidas: {{ extensoes }}</p>
-
-          <form id="form-upload" class="linha-admin">
-            <input class="input-admin" type="file" name="ficheiro" id="ficheiro" required>
-            <button class="botao-pequeno" type="submit">Enviar</button>
-          </form>
-
-          <p id="resultado" class="avisos"></p>
-        </div>
-
-        <div class="admin-cartao">
-          <h2>Ficheiros enviados</h2>
-
-          {% if ficheiros|length == 0 %}
-            <p class="avisos">Ainda não há ficheiros enviados.</p>
-          {% else %}
-            <ul class="lista-ficheiros" id="lista-ficheiros">
-              {% for f in ficheiros %}
-                <li>
-                  <a class="ligacao" href="/admin/ficheiros/{{ f }}?pw={{ pw }}">{{ f }}</a>
-                  &nbsp;—&nbsp;
-                  <button class="botao-pequeno" data-apagar="{{ f }}" type="button">Apagar</button>
-                </li>
-              {% endfor %}
-            </ul>
-          {% endif %}
-        </div>
-      {% endif %}
-
-    </section>
+      </div>
+    {% endif %}
   </main>
-
-  {% if autorizado %}
-  <script>
-    const pw = "{{ pw }}";
-    const form = document.getElementById("form-upload");
-    const resultado = document.getElementById("resultado");
-
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      resultado.textContent = "A enviar...";
-
-      const input = document.getElementById("ficheiro");
-      if (!input.files || input.files.length === 0) {
-        resultado.textContent = "Escolhe um ficheiro.";
-        return;
-      }
-
-      const dados = new FormData();
-      dados.append("ficheiro", input.files[0]);
-
-      const resp = await fetch(`/admin/upload?pw=${encodeURIComponent(pw)}`, {
-        method: "POST",
-        body: dados
-      });
-
-      const json = await resp.json().catch(() => ({}));
-
-      if (!resp.ok) {
-        resultado.textContent = json.erro || "Erro no upload.";
-        return;
-      }
-
-      resultado.textContent = `Enviado: ${json.ficheiro}. Atualiza a página para ver na lista.`;
-      input.value = "";
-    });
-
-    document.querySelectorAll("button[data-apagar]").forEach(btn => {
-      btn.addEventListener("click", async () => {
-        const nome = btn.getAttribute("data-apagar");
-        if (!confirm(`Apagar ${nome}?`)) return;
-
-        const resp = await fetch(`/admin/apagar/${encodeURIComponent(nome)}?pw=${encodeURIComponent(pw)}`, {
-          method: "POST"
-        });
-
-        if (resp.ok) {
-          location.reload();
-        } else {
-          alert("Não foi possível apagar.");
-        }
-      });
-    });
-  </script>
-  {% endif %}
 </body>
 </html>
-
