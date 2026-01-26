@@ -3,57 +3,48 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Admin</title>
+  <title>Admin - Login</title>
   <link rel="stylesheet" href="/static/estilo.css" />
   <style>
-    .bloco-admin {
-      background: rgba(255,255,255,0.06);
-      border: 1px solid rgba(255,255,255,0.12);
-      border-radius: 16px;
-      padding: 18px 16px;
-      margin-top: 18px;
-    }
-    .botoes-admin {
-      display: flex;
-      gap: 12px;
-      flex-wrap: wrap;
-      margin-top: 10px;
-    }
-    .btn-admin {
-      padding: 14px 16px;
-      border-radius: 14px;
-      border: 1px solid rgba(255,255,255,0.12);
-      background: rgba(255,255,255,0.12);
-      color: #e7ecff;
-      font-weight: 800;
-      cursor: pointer;
-      text-decoration: none;
-      display: inline-block;
-    }
-    .btn-admin:hover {
-      background: rgba(255,255,255,0.18);
-    }
+    .admin-caixa { max-width: 520px; margin: 0 auto; padding: 20px; }
+    .admin-cartao { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 16px; padding: 18px 16px; }
+    .admin-form { display: grid; gap: 12px; margin-top: 12px; }
+    .admin-form label { color: rgba(231,236,255,0.85); font-weight: 650; }
+    .admin-form input { width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.12); background: rgba(0,0,0,0.18); color: #e7ecff; font-size: 1rem; }
+    .admin-acoes { display: flex; gap: 10px; justify-content: flex-end; align-items: center; }
+    .admin-erro { margin-top: 10px; padding: 10px 12px; border-radius: 12px; border: 1px solid rgba(255,120,120,0.35); background: rgba(255,0,0,0.08); }
+    a.link { color: #e7ecff; opacity: 0.85; }
   </style>
 </head>
-
 <body>
-  <main class="caixa-principal">
-    <header class="cabecalho">
-      <h1>Admin</h1>
-    </header>
+  <main class="admin-caixa">
+    <div class="admin-cartao">
+      <h1 style="margin:0 0 6px;">Área de Admin</h1>
+      <p style="margin:0; color: rgba(231,236,255,0.75); line-height:1.4;">
+        Inicia sessão para aceder ao painel.
+      </p>
 
-    {% if not autorizado %}
-      <div class="bloco-admin">
-        <p><strong>Acesso negado.</strong></p>
-      </div>
-    {% else %}
-      <div class="bloco-admin">
-        <div class="botoes-admin">
-          <a class="btn-admin" href="/admin/download_txt?u={{ u }}&p={{ p }}">Download TXT</a>
-          <a class="btn-admin" href="/admin/download_db?u={{ u }}&p={{ p }}">Download DB</a>
+      {% if erro %}
+        <div class="admin-erro">{{ erro }}</div>
+      {% endif %}
+
+      <form class="admin-form" method="post" action="/admin">
+        <div>
+          <label for="utilizador">Utilizador</label>
+          <input id="utilizador" name="utilizador" autocomplete="username" required />
         </div>
-      </div>
-    {% endif %}
+
+        <div>
+          <label for="senha">Senha</label>
+          <input id="senha" name="senha" type="password" autocomplete="current-password" required />
+        </div>
+
+        <div class="admin-acoes">
+          <a class="link" href="/">Voltar</a>
+          <button class="botao-fechar" type="submit">Entrar</button>
+        </div>
+      </form>
+    </div>
   </main>
 </body>
 </html>
