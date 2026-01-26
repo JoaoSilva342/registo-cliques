@@ -10,11 +10,10 @@
 <body>
   <main class="caixa-principal">
 
-    <header class="cabecalho">
+    <header class="cabecalho cabecalho-topo">
       <h1>Registo de Cliques</h1>
-      <p>
 
-      </p>
+      <button id="botao-admin" class="botao-admin" type="button">Admin</button>
     </header>
 
     <section class="zona-botoes">
@@ -43,34 +42,27 @@
 
   </main>
 
-  <!-- Nota / Modal -->
-  <div id="fundo-modal" class="fundo-modal escondido" role="dialog" aria-modal="true" aria-labelledby="titulo-modal">
+  <!-- Modal de login admin -->
+  <div id="fundo-admin" class="fundo-modal escondido" role="dialog" aria-modal="true" aria-labelledby="titulo-admin">
     <div class="modal" role="document">
-      <h2 id="titulo-modal">Clique registado</h2>
+      <h2 id="titulo-admin">Entrar como administrador</h2>
 
       <div class="linha">
-        <span class="etiqueta">Botão clicado:</span>
-        <span id="modal-botao" class="valor"></span>
+        <span class="etiqueta">Utilizador:</span>
+        <input id="admin-user" class="input-admin" type="text" placeholder="admin" value="admin">
       </div>
 
       <div class="linha">
-        <span class="etiqueta">Data:</span>
-        <span id="modal-data" class="valor"></span>
-      </div>
-
-      <div class="linha">
-        <span class="etiqueta">Hora:</span>
-        <span id="modal-hora" class="valor"></span>
-      </div>
-
-      <div class="linha">
-        <span class="etiqueta">Cliques deste botão hoje:</span>
-        <span id="modal-total-botao" class="valor"></span>
+        <span class="etiqueta">Senha:</span>
+        <input id="admin-pass" class="input-admin" type="password" placeholder="admin123">
       </div>
 
       <div class="acoes-modal">
-        <button id="fechar-modal" class="botao-fechar">Fechar</button>
+        <button id="entrar-admin" class="botao-fechar">Entrar</button>
+        <button id="cancelar-admin" class="botao-fechar" style="margin-left:10px;">Cancelar</button>
       </div>
+
+      <p id="erro-admin" class="erro-admin"></p>
     </div>
   </div>
 
