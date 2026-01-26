@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="pt">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin - Painel</title>
+  <link rel="stylesheet" href="/static/estilo.css" />
+  <style>
+    .admin-caixa { max-width: 980px; margin: 0 auto; padding: 20px; }
+    .topo { display:flex; align-items:flex-start; justify-content: space-between; gap: 12px; }
+    .cartao { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 16px; padding: 18px 16px; }
+    .grid { display:grid; grid-template-columns: 1fr; gap: 14px; margin-top: 14px; }
+    .chips { display:flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+    .chip { padding: 10px 12px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.12); background: rgba(0,0,0,0.18); }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 10px 10px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+    th { color: rgba(231,236,255,0.75); font-weight: 800; }
+    td { color: rgba(231,236,255,0.95); }
+    .acoes { display:flex; gap: 10px; justify-content: flex-end; }
+  </style>
+</head>
+<body>
+  <main class="admin-caixa">
+    <div class="topo">
+      <div class="cartao" style="flex:1;">
+        <h1 style="margin:0 0 6px;">Painel de Admin</h1>
+        <p style="margin:0; color: rgba(231,236,255,0.75); line-height:1.4;">
+          Resumo de hoje ({{ data_hoje }}) e últimos cliques.
+        </p>
+
+        <div class="chips">
+          <div class="chip"><strong>Total hoje:</strong> {{ total_hoje }}</div>
+          <div class="chip"><strong>Botão 1:</strong> {{ contagens["Botão 1"] }}</div>
+          <div class="chip"><strong>Botão 2:</strong> {{ contagens["Botão 2"] }}</div>
+          <div class="chip"><strong>Botão 3:</strong> {{ contagens["Botão 3"] }}</div>
+          <div class="chip"><strong>Botão 4:</strong> {{ contagens["Botão 4"] }}</div>
+        </div>
+      </div>
+
+      <div class="cartao" style="min-width: 220px;">
+        <div class="acoes">
+          <a class="botao-fechar" href="/">Site</a>
+          <a class="botao-fechar" href="/admin/logout">Sair</a>
+        </div>
+        
+        <hr style="border:none; border-top:1px solid rgba(255,255,255,0.12); margin:12px 0;" />
+        <p style="margin:0 0 8px; color: rgba(231,236,255,0.80); font-weight:800;">Exportar cliques de hoje</p>
+        <div style="display:flex; flex-wrap:wrap; gap:10px;">
+          <a class="botao-fechar" href="/admin/export/txt?dia={{ data_hoje }}">TXT</a>
+          <a class="botao-fechar" href="/admin/export/csv?dia={{ data_hoje }}">CSV</a>
+          <a class="botao-fechar" href="/admin/export/json?dia={{ data_hoje }}">JSON</a>
+        </div>
+
+        <p style="margin:10px 0 0; color: rgba(231,236,255,0.70);">
+        
+        </p>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="cartao">
+        <h2 style="margin:0 0 10px; font-size: 1.25rem;">Últimos 100 cliques</h2>
+
+        <div style="overflow:auto;">
+          <table>
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Hora</th>
+                <th>Sequencial</th>
+                <th>Botão</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in ultimos %}
+                <tr>
+                  <td>{{ r["data"] }}</td>
+                  <td>{{ r["hora"] }}</td>
+                  <td>{{ r["sequencial"] }}</td>
+                  <td>{{ r["botao"] }}</td>
+                </tr>
+              {% endfor %}
+              {% if ultimos|length == 0 %}
+                <tr><td colspan="4">Sem registos.</td></tr>
+              {% endif %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+</body>
+</html>
