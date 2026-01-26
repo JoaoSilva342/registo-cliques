@@ -1,21 +1,14 @@
-from flask import Flask, render_template, request, jsonify, send_file, abort, Response
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for, Response
 import sqlite3
-from datetime import datetime
 import os
+import io
+import csv
+from datetime import datetime
 
 NOME_BASE_DADOS = "cliques.db"
 
-# ADMIN
-UTILIZADOR_ADMIN = "admin"
-SENHA_ADMIN = os.getenv("ADMIN_PASSWORD", "admin123")  # podes deixar assim
-
 aplicacao = Flask(__name__)
-
-def verificar_admin() -> bool:
-    # Admin entra com /admin?u=admin&p=admin123
-    u = request.args.get("u", "")
-    p = request.args.get("p", "")
-    return (u == UTILIZADOR_ADMIN and p == SENHA_ADMIN)
+aplicacao.secret_key = "muda-isto-para-uma-chave-secreta"
 
 def obter_ligacao_base_dados():
     ligacao = sqlite3.connect(NOME_BASE_DADOS)
@@ -57,8 +50,10 @@ def registar_clique():
     ligacao = obter_ligacao_base_dados()
     cursor = ligacao.cursor()
 
+    # Sequencial diário: máximo do dia + 1
     cursor.execute("SELECT COALESCE(MAX(sequencial), 0) AS maximo FROM cliques WHERE data = ?", (data_texto,))
-    sequencial = cursor.fetchone()["maximo"] + 1
+    maximo = cursor.fetchone()["maximo"]
+    sequencial = maximo + 1
 
     cursor.execute(
         "INSERT INTO cliques(botao, sequencial, data, hora) VALUES (?, ?, ?, ?)",
@@ -66,6 +61,7 @@ def registar_clique():
     )
     ligacao.commit()
 
+    # Quantas vezes este botão foi clicado HOJE
     cursor.execute("SELECT COUNT(*) AS total FROM cliques WHERE data = ? AND botao = ?", (data_texto, botao))
     total_botao_hoje = cursor.fetchone()["total"]
 
@@ -93,7 +89,11 @@ def contagens_hoje():
         contagens[b] = cursor.fetchone()["total"]
 
     ligacao.close()
-    return jsonify({"data": data_texto, "contagens": contagens})
+
+    return jsonify({
+        "data": data_texto,
+        "contagens": contagens
+    })
 
 @aplicacao.route("/hoje", methods=["GET"])
 def ver_cliques_de_hoje():
@@ -102,6 +102,7 @@ def ver_cliques_de_hoje():
 
     ligacao = obter_ligacao_base_dados()
     cursor = ligacao.cursor()
+
     cursor.execute("""
         SELECT botao, sequencial, data, hora
         FROM cliques
@@ -109,74 +110,191 @@ def ver_cliques_de_hoje():
         ORDER BY id DESC
         LIMIT 20
     """, (data_texto,))
+
     registos = [dict(linha) for linha in cursor.fetchall()]
     ligacao.close()
 
-    return jsonify({"data": data_texto, "ultimos_20": registos})
+    return jsonify({
+        "data": data_texto,
+        "ultimos_20": registos
+    })
 
-# =========================
-# ADMIN: página simples
-# =========================
-@aplicacao.route("/admin", methods=["GET"])
-def pagina_admin():
-    if not verificar_admin():
-        return render_template("admin.html", autorizado=False, u="", p=""), 403
 
-    u = request.args.get("u", "")
-    p = request.args.get("p", "")
-    return render_template("admin.html", autorizado=True, u=u, p=p)
 
-@aplicacao.route("/admin/download_db", methods=["GET"])
-def admin_download_db():
-    if not verificar_admin():
-        abort(403)
+# ===== Admin (simples) =====
+UTILIZADOR_ADMIN = "admin"
+SENHA_ADMIN = "admin123"
 
-    if not os.path.exists(NOME_BASE_DADOS):
-        abort(404)
+def _esta_admin():
+    return bool(session.get("admin_autenticado"))
 
-    # Faz download do ficheiro cliques.db
-    return send_file(
-        NOME_BASE_DADOS,
-        as_attachment=True,
-        download_name="cliques.db"
-    )
+def _exigir_admin():
+    if not _esta_admin():
+        return redirect(url_for("admin_login"))
+    return None
 
-@aplicacao.route("/admin/download_txt", methods=["GET"])
-def admin_download_txt():
-    if not verificar_admin():
-        abort(403)
+@aplicacao.route("/admin", methods=["GET", "POST"])
+def admin_login():
+    erro = None
+    if request.method == "POST":
+        utilizador = (request.form.get("utilizador") or "").strip()
+        senha = request.form.get("senha") or ""
+        if utilizador == UTILIZADOR_ADMIN and senha == SENHA_ADMIN:
+            session["admin_autenticado"] = True
+            return redirect(url_for("admin_painel"))
+        erro = "Credenciais inválidas."
+    return render_template("admin_login.html", erro=erro)
+
+@aplicacao.route("/admin/painel")
+def admin_painel():
+    red = _exigir_admin()
+    if red:
+        return red
 
     ligacao = obter_ligacao_base_dados()
     cursor = ligacao.cursor()
+
+    # Resumo de hoje
+    agora = datetime.now()
+    data_texto = agora.strftime("%Y-%m-%d")
+
+    cursor.execute("SELECT COUNT(*) AS total FROM cliques WHERE data = ?", (data_texto,))
+    total_hoje = cursor.fetchone()["total"]
+
+    contagens = {}
+    for b in ["Botão 1", "Botão 2", "Botão 3", "Botão 4"]:
+        cursor.execute("SELECT COUNT(*) AS total FROM cliques WHERE data = ? AND botao = ?", (data_texto, b))
+        contagens[b] = cursor.fetchone()["total"]
+
+    # Últimos 100 cliques (geral)
     cursor.execute("""
-        SELECT id, botao, sequencial, data, hora
+        SELECT botao, sequencial, data, hora
         FROM cliques
-        ORDER BY id ASC
+        ORDER BY id DESC
+        LIMIT 100
     """)
-    linhas = cursor.fetchall()
+    ultimos = [dict(linha) for linha in cursor.fetchall()]
+
     ligacao.close()
 
-    # Gerar texto simples
-    conteudo = []
-    conteudo.append("REGISTO DE CLIQUES (BASE DE DADOS)\n")
-    conteudo.append("Formato: id | botao | sequencial | data | hora\n")
-    conteudo.append("-" * 60 + "\n")
-
-    for l in linhas:
-        conteudo.append(f"{l['id']} | {l['botao']} | {l['sequencial']} | {l['data']} | {l['hora']}\n")
-
-    texto_final = "".join(conteudo)
-
-    return Response(
-        texto_final,
-        mimetype="text/plain",
-        headers={
-            "Content-Disposition": "attachment; filename=cliques.txt"
-        }
+    return render_template(
+        "admin_painel.html",
+        data_hoje=data_texto,
+        total_hoje=total_hoje,
+        contagens=contagens,
+        ultimos=ultimos
     )
+
+def _obter_resumo_e_cliques_do_dia(data_texto: str):
+    ligacao = obter_ligacao_base_dados()
+    cursor = ligacao.cursor()
+
+    cursor.execute("SELECT COUNT(*) AS total FROM cliques WHERE data = ?", (data_texto,))
+    total = cursor.fetchone()["total"]
+
+    contagens = {}
+    for b in ["Botão 1", "Botão 2", "Botão 3", "Botão 4"]:
+        cursor.execute("SELECT COUNT(*) AS total FROM cliques WHERE data = ? AND botao = ?", (data_texto, b))
+        contagens[b] = cursor.fetchone()["total"]
+
+    cursor.execute('''
+        SELECT botao, sequencial, data, hora
+        FROM cliques
+        WHERE data = ?
+        ORDER BY id ASC
+    ''', (data_texto,))
+    registos = [dict(linha) for linha in cursor.fetchall()]
+
+    ligacao.close()
+    return total, contagens, registos
+
+
+@aplicacao.route("/admin/export/txt")
+def admin_exportar_txt():
+    red = _exigir_admin()
+    if red:
+        return red
+
+    data_texto = request.args.get("dia") or datetime.now().strftime("%Y-%m-%d")
+    total, contagens, registos = _obter_resumo_e_cliques_do_dia(data_texto)
+
+    linhas = []
+    linhas.append(f"Relatório de cliques — {data_texto}")
+    linhas.append("")
+    linhas.append(f"Total do dia: {total}")
+    for b in ["Botão 1", "Botão 2", "Botão 3", "Botão 4"]:
+        linhas.append(f"{b}: {contagens.get(b, 0)}")
+    linhas.append("")
+    linhas.append("Registos (ordem de criação):")
+    linhas.append("hora\tsequencial\tbotao")
+    for r in registos:
+        linhas.append(f"{r['hora']}\t{r['sequencial']}\t{r['botao']}")
+
+    conteudo = "\n".join(linhas) + "\n"
+    nome = f"cliques_{data_texto}.txt"
+    return Response(
+        conteudo,
+        mimetype="text/plain; charset=utf-8",
+        headers={"Content-Disposition": f"attachment; filename={nome}"}
+    )
+
+
+@aplicacao.route("/admin/export/csv")
+def admin_exportar_csv():
+    red = _exigir_admin()
+    if red:
+        return red
+
+    data_texto = request.args.get("dia") or datetime.now().strftime("%Y-%m-%d")
+    _total, _contagens, registos = _obter_resumo_e_cliques_do_dia(data_texto)
+
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["data", "hora", "sequencial", "botao"])
+    for r in registos:
+        w.writerow([r["data"], r["hora"], r["sequencial"], r["botao"]])
+
+    nome = f"cliques_{data_texto}.csv"
+    return Response(
+        buf.getvalue(),
+        mimetype="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f"attachment; filename={nome}"}
+    )
+
+
+@aplicacao.route("/admin/export/json")
+def admin_exportar_json():
+    red = _exigir_admin()
+    if red:
+        return red
+
+    data_texto = request.args.get("dia") or datetime.now().strftime("%Y-%m-%d")
+    total, contagens, registos = _obter_resumo_e_cliques_do_dia(data_texto)
+
+    payload = {
+        "data": data_texto,
+        "total": total,
+        "contagens": contagens,
+        "registos": registos
+    }
+
+    nome = f"cliques_{data_texto}.json"
+    import json
+    return Response(
+        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+        mimetype="application/json; charset=utf-8",
+        headers={"Content-Disposition": f"attachment; filename={nome}"}
+    )
+
+
+@aplicacao.route("/admin/logout")
+def admin_logout():
+    session.pop("admin_autenticado", None)
+    return redirect(url_for("pagina_inicial"))
+
 
 if __name__ == "__main__":
     iniciar_base_dados()
-    aplicacao.run(host="0.0.0.0", port=5000, debug=True)
+    aplicacao.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=True)
 else:
     iniciar_base_dados()
