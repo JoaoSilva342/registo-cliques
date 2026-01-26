@@ -150,3 +150,63 @@ body {
 .botao-fechar:hover {
   background: rgba(255,255,255,0.18);
 }
+
+
+/* ===== Admin ===== */
+.cabecalho-topo{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap: 12px;
+}
+
+.cabecalho-acoes{
+  display:flex;
+  align-items:center;
+  gap: 10px;
+}
+
+.botao-ajuda{
+  padding: 10px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--borda);
+  background: rgba(0,0,0,0.18);
+  color: var(--texto);
+  font-weight: 800;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.botao-ajuda:hover{ background: rgba(0,0,0,0.28); }
+
+.botao-admin{
+  text-decoration:none;
+  padding: 10px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--borda);
+  background: rgba(255,255,255,0.10);
+  color: var(--texto);
+  font-weight: 800;
+  font-size: 1rem;
+}
+
+.botao-admin:hover{ background: rgba(255,255,255,0.18); }
+
+/* ===== Tutorial (Intro.js) =====
+   Garante que o texto do tutorial aparece a preto (tooltip e botões).
+*/
+.introjs-tooltip,
+.introjs-tooltiptext,
+.introjs-tooltip-title,
+.introjs-helperNumberLayer,
+.introjs-button,
+.introjs-skipbutton,
+.introjs-nextbutton,
+.introjs-prevbutton {
+  color: #000 !important;
+}
+
+/* Opcional: melhora o contraste do fundo do tooltip (mantém-se claro). */
+.introjs-tooltip {
+  background-color: #fff !important;
+}
