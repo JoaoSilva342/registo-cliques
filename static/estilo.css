@@ -210,3 +210,15 @@ body {
 .introjs-tooltip {
   background-color: #fff !important;
 }
+
+
+.mensagem {
+  min-height: 1.2em;
+  color: var(--texto-apagado);
+  font-weight: 700;
+  padding-left: 4px;
+}
+
+.mensagem-visivel {
+  color: var(--texto);
+}
