@@ -6,11 +6,6 @@ const modalData = document.getElementById("modal-data");
 const modalHora = document.getElementById("modal-hora");
 const modalTotalBotao = document.getElementById("modal-total-botao");
 
-const contB1 = document.getElementById("cont-b1");
-const contB2 = document.getElementById("cont-b2");
-const contB3 = document.getElementById("cont-b3");
-const contB4 = document.getElementById("cont-b4");
-
 // Fecha automaticamente o modal após alguns segundos.
 let temporizadorFechoModal = null;
 
@@ -116,17 +111,30 @@ async function obterContagensHoje() {
 }
 
 function aplicarContagens(contagens) {
-  contB1.textContent = contagens["Botão 1"] ?? 0;
-  contB2.textContent = contagens["Botão 2"] ?? 0;
-  contB3.textContent = contagens["Botão 3"] ?? 0;
-  contB4.textContent = contagens["Botão 4"] ?? 0;
+  document.querySelectorAll("[data-contador-id]").forEach((el) => {
+    const id = el.getAttribute("data-contador-id");
+    el.textContent = contagens?.[id] ?? 0;
+  });
 }
 
-async function enviarClique(nomeBotao) {
+function mostrarObrigado(botaoId) {
+  const el = document.querySelector(`[data-mensagem-id="${botaoId}"]`);
+  if (!el) return;
+
+  el.textContent = "Obrigado por clicar";
+  el.classList.add("mensagem-visivel");
+
+  setTimeout(() => {
+    el.textContent = "";
+    el.classList.remove("mensagem-visivel");
+  }, 2500);
+}
+
+async function enviarClique(botaoId) {
   const resposta = await fetch("/clique", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ botao: nomeBotao })
+    body: JSON.stringify({ botao_id: botaoId })
   });
 
   if (!resposta.ok) {
@@ -139,12 +147,13 @@ async function enviarClique(nomeBotao) {
 
 document.querySelectorAll(".botao").forEach(botao => {
   botao.addEventListener("click", async () => {
-    const nomeBotao = botao.dataset.botao;
+        const botaoId = botao.dataset.botaoId;
     botao.disabled = true;
 
     try {
-      const dados = await enviarClique(nomeBotao);
+            const dados = await enviarClique(botaoId);
       abrirModal(dados);
+      mostrarObrigado(dados.botao_id);
 
       const info = await obterContagensHoje();
       aplicarContagens(info.contagens);
