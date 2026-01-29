@@ -52,13 +52,36 @@
         </div>
 
         <p style="margin:10px 0 0; color: rgba(231,236,255,0.70);">
-        
+          Dica: muda a <em>secret_key</em> e as credenciais no <code>aplicacao.py</code>.
         </p>
       </div>
     </div>
 
-    <div class="grid">
-      <div class="cartao">
+    
+<div class="grid">
+  <div class="cartao">
+    <h2 style="margin:0 0 10px; font-size: 1.25rem;">Mudar nomes dos botões</h2>
+
+    <form method="POST" action="/admin/guardar_botoes">
+      {% for b in botoes %}
+        <label style="display:block; margin: 0 0 10px;">
+          <span style="display:block; margin-bottom:6px; color: rgba(231,236,255,0.80); font-weight:800;">
+            Botão {{ b.id }}
+          </span>
+          <input type="text" name="nomes" value="{{ b.nome }}" required style="width:100%; padding:10px 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.18); background: rgba(0,0,0,0.25); color: rgba(231,236,255,0.95);" />
+        </label>
+      {% endfor %}
+      <div class="acoes" style="justify-content:flex-start;">
+        <button class="botao-fechar" type="submit">Guardar</button>
+      </div>
+    </form>
+
+    <p style="margin:10px 0 0; color: rgba(231,236,255,0.70);">
+      Os novos nomes aparecem logo na página inicial.
+    </p>
+  </div>
+
+  <div class="cartao">
         <h2 style="margin:0 0 10px; font-size: 1.25rem;">Últimos 100 cliques</h2>
 
         <div style="overflow:auto;">
