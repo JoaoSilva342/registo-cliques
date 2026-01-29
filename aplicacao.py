@@ -15,12 +15,30 @@ def obter_ligacao_base_dados():
     ligacao.row_factory = sqlite3.Row
     return ligacao
 
+NUM_BOTOES = 4
+
+def obter_botoes():
+    """Devolve lista de botões configurados (id, nome)."""
+    ligacao = obter_ligacao_base_dados()
+    cursor = ligacao.cursor()
+    cursor.execute("SELECT id, nome FROM botoes ORDER BY id")
+    botoes = [dict(linha) for linha in cursor.fetchall()]
+    ligacao.close()
+    return botoes
+
+def obter_mapa_botoes():
+    return {b["id"]: b["nome"] for b in obter_botoes()}
+
+
 def iniciar_base_dados():
     ligacao = obter_ligacao_base_dados()
     cursor = ligacao.cursor()
+
+    # Tabela de cliques
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS cliques (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            botao_id INTEGER,
             botao TEXT NOT NULL,
             sequencial INTEGER NOT NULL,
             data TEXT NOT NULL,   -- AAAA-MM-DD
@@ -28,20 +46,57 @@ def iniciar_base_dados():
         )
     """)
     cursor.execute("CREATE INDEX IF NOT EXISTS indice_data ON cliques(data)")
+
+    # Tabela de configuração dos botões (nomes editáveis no admin)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS botoes (
+            id INTEGER PRIMARY KEY,
+            nome TEXT NOT NULL
+        )
+    """)
+
+    # Nomes por defeito (se ainda não existirem)
+    for i in range(1, NUM_BOTOES + 1):
+        cursor.execute(
+            "INSERT OR IGNORE INTO botoes (id, nome) VALUES (?, ?)",
+            (i, f"Botão {i}")
+        )
+
+    # Migração simples: garantir coluna botao_id (caso a BD seja antiga)
+    cursor.execute("PRAGMA table_info(cliques)")
+    colunas = [linha["name"] for linha in cursor.fetchall()]
+    if "botao_id" not in colunas:
+        cursor.execute("ALTER TABLE cliques ADD COLUMN botao_id INTEGER")
+
+    # Preencher botao_id em registos antigos (quando possível)
+    for i in range(1, NUM_BOTOES + 1):
+        cursor.execute(
+            "UPDATE cliques SET botao_id = ? WHERE botao_id IS NULL AND botao = ?",
+            (i, f"Botão {i}")
+        )
+
     ligacao.commit()
     ligacao.close()
 
 @aplicacao.route("/")
 def pagina_inicial():
-    return render_template("pagina_inicial.html")
+    botoes = obter_botoes()
+    return render_template("pagina_inicial.html", botoes=botoes)
+
 
 @aplicacao.route("/clique", methods=["POST"])
 def registar_clique():
     dados = request.get_json(silent=True) or {}
-    botao = dados.get("botao")
+    try:
+        botao_id = int(dados.get("botao_id"))
+    except (TypeError, ValueError):
+        botao_id = None
 
-    if botao not in ["Botão 1", "Botão 2", "Botão 3", "Botão 4"]:
+    mapa = obter_mapa_botoes()
+    if not botao_id or botao_id not in mapa:
         return jsonify({"erro": "Botão inválido."}), 400
+
+    nome_botao = mapa[botao_id]
 
     agora = datetime.now()
     data_texto = agora.strftime("%Y-%m-%d")
@@ -51,24 +106,31 @@ def registar_clique():
     cursor = ligacao.cursor()
 
     # Sequencial diário: máximo do dia + 1
-    cursor.execute("SELECT COALESCE(MAX(sequencial), 0) AS maximo FROM cliques WHERE data = ?", (data_texto,))
+    cursor.execute(
+        "SELECT COALESCE(MAX(sequencial), 0) AS maximo FROM cliques WHERE data = ?",
+        (data_texto,)
+    )
     maximo = cursor.fetchone()["maximo"]
     sequencial = maximo + 1
 
     cursor.execute(
-        "INSERT INTO cliques(botao, sequencial, data, hora) VALUES (?, ?, ?, ?)",
-        (botao, sequencial, data_texto, hora_texto)
+        "INSERT INTO cliques(botao_id, botao, sequencial, data, hora) VALUES (?, ?, ?, ?, ?)",
+        (botao_id, nome_botao, sequencial, data_texto, hora_texto)
     )
     ligacao.commit()
 
-    # Quantas vezes este botão foi clicado HOJE
-    cursor.execute("SELECT COUNT(*) AS total FROM cliques WHERE data = ? AND botao = ?", (data_texto, botao))
+    # Quantas vezes este botão foi clicado HOJE (por id)
+    cursor.execute(
+        "SELECT COUNT(*) AS total FROM cliques WHERE data = ? AND botao_id = ?",
+        (data_texto, botao_id)
+    )
     total_botao_hoje = cursor.fetchone()["total"]
 
     ligacao.close()
 
     return jsonify({
-        "botao": botao,
+        "botao_id": botao_id,
+        "botao": nome_botao,
         "sequencial": sequencial,
         "data": data_texto,
         "hora": hora_texto,
@@ -80,21 +142,26 @@ def contagens_hoje():
     agora = datetime.now()
     data_texto = agora.strftime("%Y-%m-%d")
 
+    botoes = obter_botoes()
+
     ligacao = obter_ligacao_base_dados()
     cursor = ligacao.cursor()
 
     contagens = {}
-    for b in ["Botão 1", "Botão 2", "Botão 3", "Botão 4"]:
-        cursor.execute("SELECT COUNT(*) AS total FROM cliques WHERE data = ? AND botao = ?", (data_texto, b))
-        contagens[b] = cursor.fetchone()["total"]
+    for b in botoes:
+        cursor.execute(
+            "SELECT COUNT(*) AS total FROM cliques WHERE data = ? AND botao_id = ?",
+            (data_texto, b["id"])
+        )
+        contagens[str(b["id"])] = cursor.fetchone()["total"]
 
     ligacao.close()
 
     return jsonify({
         "data": data_texto,
+        "botoes": botoes,
         "contagens": contagens
     })
-
 @aplicacao.route("/hoje", methods=["GET"])
 def ver_cliques_de_hoje():
     agora = datetime.now()
@@ -161,14 +228,18 @@ def admin_painel():
     cursor.execute("SELECT COUNT(*) AS total FROM cliques WHERE data = ?", (data_texto,))
     total_hoje = cursor.fetchone()["total"]
 
+    botoes = obter_botoes()
     contagens = {}
-    for b in ["Botão 1", "Botão 2", "Botão 3", "Botão 4"]:
-        cursor.execute("SELECT COUNT(*) AS total FROM cliques WHERE data = ? AND botao = ?", (data_texto, b))
-        contagens[b] = cursor.fetchone()["total"]
+    for b in botoes:
+        cursor.execute(
+            "SELECT COUNT(*) AS total FROM cliques WHERE data = ? AND botao_id = ?",
+            (data_texto, b["id"])
+        )
+        contagens[str(b["id"])] = cursor.fetchone()["total"]
 
     # Últimos 100 cliques (geral)
     cursor.execute("""
-        SELECT botao, sequencial, data, hora
+        SELECT botao, botao_id, sequencial, data, hora
         FROM cliques
         ORDER BY id DESC
         LIMIT 100
@@ -182,8 +253,31 @@ def admin_painel():
         data_hoje=data_texto,
         total_hoje=total_hoje,
         contagens=contagens,
-        ultimos=ultimos
+        ultimos=ultimos,
+        botoes=botoes
     )
+
+@aplicacao.route("/admin/guardar_botoes", methods=["POST"])
+def guardar_botoes():
+    red = _exigir_admin()
+    if red:
+        return red
+
+    nomes = request.form.getlist("nomes")
+
+    ligacao = obter_ligacao_base_dados()
+    cursor = ligacao.cursor()
+
+    # Garante exactamente NUM_BOTOES nomes
+    for i in range(1, NUM_BOTOES + 1):
+        nome = (nomes[i-1] if i-1 < len(nomes) else f"Botão {i}").strip() or f"Botão {i}"
+        cursor.execute("UPDATE botoes SET nome = ? WHERE id = ?", (nome, i))
+
+    ligacao.commit()
+    ligacao.close()
+
+    return redirect(url_for("admin_painel"))
+
 
 def _obter_resumo_e_cliques_do_dia(data_texto: str):
     ligacao = obter_ligacao_base_dados()
@@ -192,13 +286,17 @@ def _obter_resumo_e_cliques_do_dia(data_texto: str):
     cursor.execute("SELECT COUNT(*) AS total FROM cliques WHERE data = ?", (data_texto,))
     total = cursor.fetchone()["total"]
 
+    botoes = obter_botoes()
     contagens = {}
-    for b in ["Botão 1", "Botão 2", "Botão 3", "Botão 4"]:
-        cursor.execute("SELECT COUNT(*) AS total FROM cliques WHERE data = ? AND botao = ?", (data_texto, b))
-        contagens[b] = cursor.fetchone()["total"]
+    for b in botoes:
+        cursor.execute(
+            "SELECT COUNT(*) AS total FROM cliques WHERE data = ? AND botao_id = ?",
+            (data_texto, b["id"])
+        )
+        contagens[str(b["id"])] = cursor.fetchone()["total"]
 
     cursor.execute('''
-        SELECT botao, sequencial, data, hora
+        SELECT botao, botao_id, sequencial, data, hora
         FROM cliques
         WHERE data = ?
         ORDER BY id ASC
@@ -209,6 +307,7 @@ def _obter_resumo_e_cliques_do_dia(data_texto: str):
     return total, contagens, registos
 
 
+
 @aplicacao.route("/admin/export/txt")
 def admin_exportar_txt():
     red = _exigir_admin()
@@ -217,13 +316,14 @@ def admin_exportar_txt():
 
     data_texto = request.args.get("dia") or datetime.now().strftime("%Y-%m-%d")
     total, contagens, registos = _obter_resumo_e_cliques_do_dia(data_texto)
+    botoes = obter_botoes()
 
     linhas = []
     linhas.append(f"Relatório de cliques — {data_texto}")
     linhas.append("")
     linhas.append(f"Total do dia: {total}")
-    for b in ["Botão 1", "Botão 2", "Botão 3", "Botão 4"]:
-        linhas.append(f"{b}: {contagens.get(b, 0)}")
+    for b in botoes:
+        linhas.append(f'{b["nome"]}: {contagens.get(str(b["id"]), 0)}')
     linhas.append("")
     linhas.append("Registos (ordem de criação):")
     linhas.append("hora\tsequencial\tbotao")
@@ -238,7 +338,6 @@ def admin_exportar_txt():
         headers={"Content-Disposition": f"attachment; filename={nome}"}
     )
 
-
 @aplicacao.route("/admin/export/csv")
 def admin_exportar_csv():
     red = _exigir_admin()
@@ -250,9 +349,9 @@ def admin_exportar_csv():
 
     buf = io.StringIO()
     w = csv.writer(buf)
-    w.writerow(["data", "hora", "sequencial", "botao"])
+    w.writerow(["data", "hora", "sequencial", "botao_id", "botao"])
     for r in registos:
-        w.writerow([r["data"], r["hora"], r["sequencial"], r["botao"]])
+        w.writerow([r["data"], r["hora"], r["sequencial"], r.get("botao_id"), r["botao"]])
 
     nome = f"cliques_{data_texto}.csv"
     return Response(
