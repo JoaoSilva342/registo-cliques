@@ -3,7 +3,7 @@ import sqlite3
 import os
 import io
 import csv
-from datetime import datetime
+from datetime import datetime, timedelta
 
 NOME_BASE_DADOS = "cliques.db"
 
@@ -237,14 +237,30 @@ def admin_painel():
         )
         contagens[str(b["id"])] = cursor.fetchone()["total"]
 
-    # Últimos 100 cliques (geral)
+    # Paginação
+    try:
+        pagina = int(request.args.get("pagina", 1))
+    except ValueError:
+        pagina = 1
+    
+    itens_por_pagina = 15
+    offset = (pagina - 1) * itens_por_pagina
+
+    cursor.execute("SELECT COUNT(*) AS total FROM cliques")
+    total_registos = cursor.fetchone()["total"]
+    total_paginas = (total_registos + itens_por_pagina - 1) // itens_por_pagina if total_registos > 0 else 1
+
+    # Garantir que a página está dentro dos limites
+    pagina = max(1, min(pagina, total_paginas))
+    offset = (pagina - 1) * itens_por_pagina
+
     cursor.execute("""
         SELECT botao, botao_id, sequencial, data, hora
         FROM cliques
         ORDER BY id DESC
-        LIMIT 100
-    """)
-    ultimos = [dict(linha) for linha in cursor.fetchall()]
+        LIMIT ? OFFSET ?
+    """, (itens_por_pagina, offset))
+    cliques_paginados = [dict(linha) for linha in cursor.fetchall()]
 
     ligacao.close()
 
@@ -253,8 +269,10 @@ def admin_painel():
         data_hoje=data_texto,
         total_hoje=total_hoje,
         contagens=contagens,
-        ultimos=ultimos,
-        botoes=botoes
+        ultimos=cliques_paginados,
+        botoes=botoes,
+        pagina_atual=pagina,
+        total_paginas=total_paginas
     )
 
 @aplicacao.route("/admin/guardar_botoes", methods=["POST"])
@@ -397,3 +415,87 @@ if __name__ == "__main__":
     aplicacao.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=True)
 else:
     iniciar_base_dados()
+
+
+@aplicacao.route("/admin/stats")
+def admin_stats():
+    red = _exigir_admin()
+    if red:
+        return red
+
+    try:
+        dias = int(request.args.get("dias", "14"))
+    except ValueError:
+        dias = 14
+    dias = max(1, min(dias, 365))
+
+    hoje = datetime.now().date()
+    inicio = hoje - timedelta(days=dias-1)
+
+    # Preparar lista de datas (AAAA-MM-DD)
+    datas = [(inicio + timedelta(days=i)).strftime("%Y-%m-%d") for i in range(dias)]
+
+    botoes = obter_botoes()  # [{id,nome}]
+    ids = [b["id"] for b in botoes]
+
+    # Inicializar estruturas
+    total_por_dia = {d: 0 for d in datas}
+    por_botao = {bid: {d: 0 for d in datas} for bid in ids}
+
+    ligacao = obter_ligacao_base_dados()
+    cursor = ligacao.cursor()
+
+    cursor.execute(
+        """
+        SELECT data, botao_id, COUNT(*) AS total
+        FROM cliques
+        WHERE data >= ?
+        GROUP BY data, botao_id
+        ORDER BY data ASC
+        """,
+        (inicio.strftime("%Y-%m-%d"),)
+    )
+    for linha in cursor.fetchall():
+        d = linha["data"]
+        bid = linha["botao_id"]
+        tot = linha["total"]
+        if d in total_por_dia:
+            total_por_dia[d] += tot
+        if bid in por_botao and d in por_botao[bid]:
+            por_botao[bid][d] = tot
+
+    ligacao.close()
+
+    resposta = {
+        "datas": datas,
+        "botoes": [{"id": b["id"], "nome": b["nome"]} for b in botoes],
+        "total": [total_por_dia[d] for d in datas],
+        "por_botao": {str(bid): [por_botao[bid][d] for d in datas] for bid in ids},
+    }
+    return jsonify(resposta)
+
+@aplicacao.route("/admin/dados_grafico")
+def dados_grafico():
+    red = _exigir_admin()
+    if red:
+        return red
+
+    ligacao = obter_ligacao_base_dados()
+    cursor = ligacao.cursor()
+
+    cursor.execute("""
+        SELECT botao, COUNT(*) as total
+        FROM cliques
+        WHERE data = date('now')
+        GROUP BY botao
+        ORDER BY botao
+    """)
+
+    dados = cursor.fetchall()
+    ligacao.close()
+
+    labels = [str(linha["botao"]) for linha in dados]
+    valores = [linha["total"] for linha in dados]
+
+    from flask import jsonify
+    return jsonify({"labels": labels, "valores": valores})
